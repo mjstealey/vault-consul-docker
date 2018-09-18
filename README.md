@@ -33,7 +33,7 @@ This work is based on content from [http://pcarion.com/2017/04/30/A-consul-a-vau
           - CONSUL_HTTP_ADDR=docker.for.mac.localhost:9500
           - VAULT_ADDR=http://docker.for.mac.localhost:9200
     ```
-2. Ensure the Vault and Consul versions in the `.env` file are the same as the one build built by the client in the `Dockerfile`
+2. Ensure the Vault and Consul versions in the `.env` file are the same as defined in the client's `Dockerfile`
 
     ```bash
     # Versions
