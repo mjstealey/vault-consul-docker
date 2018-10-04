@@ -222,7 +222,7 @@ Creating client ... done
 
 The vault client is set to volume mount the [client-scripts](client-scripts/) directory as `/mnt/data` of the running `client` container.
 
-Docker exec onto the client container, initalize and unseal the vault.
+Docker exec onto the client container, initialize and unseal the vault.
 
 ```console
 $ docker exec -ti client /bin/bash
@@ -314,7 +314,7 @@ You are now ready to start creating secrets
 
 Docker exec into the `client` container as described above.
 
-Export token (using the initial root token for demostration purposes)
+Export token (using the initial root token for demonstration purposes)
 
 ```console
 # export VAULT_TOKEN=d0d3e78f-8e5b-3cb3-bc05-d4c117a5645e
