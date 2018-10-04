@@ -4,13 +4,11 @@ services:
     container_name: consul
     command: >-
       agent
-      -server
-      -bind 0.0.0.0
-      -client 0.0.0.0
-      -bootstrap-expect=1
+      -bind=0.0.0.0
+      -config-file=/config.json
     image: consul:${CONSUL_VERSION}
     volumes:
-      - ./consul-config:/consul/config
+      - ./config/consul.json:/config.json
     networks:
       - vault
     ports:
@@ -24,14 +22,14 @@ services:
     ports:
       - "9200:8200"
     volumes:
-      - ./vault-config:/mnt/vault/config
-      - ./vault-data:/mnt/vault/data
-      - ./vault-logs:/mnt/vault/logs
+      - ./config/vault.json:/config.json
     cap_add:
       - IPC_LOCK
     networks:
       - vault
-    command: server -config /mnt/vault/config/vault-config.json
+    command: >-
+      server
+      -config=/config.json
 
   client:
     container_name: client
@@ -39,8 +37,8 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - CONSUL_HTTP_ADDR=docker.for.mac.localhost:9500
-      - VAULT_ADDR=http://docker.for.mac.localhost:9200
+      - CONSUL_HTTP_ADDR=host.docker.internal:9500
+      - VAULT_ADDR=http://host.docker.internal:9200
     volumes:
       - ./client-scripts:/mnt/data
     command: tail -f /dev/null
