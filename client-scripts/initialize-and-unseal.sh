@@ -18,6 +18,7 @@ export VAULT_TOKEN=$ROOT_TOKEN
 echo "INFO: unseal Vault"
 KEY_INDEX=0
 while [[ $(vault status > /dev/null)$? != 0 ]]; do
+  sleep 1s
   vault operator unseal $(echo "${UNSEAL_KEYS[$KEY_INDEX]}")
   KEY_INDEX=$(( $KEY_INDEX + 1 ))
 done

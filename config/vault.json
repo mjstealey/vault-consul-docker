@@ -1,0 +1,21 @@
+{
+  "backend":
+  {
+    "consul":
+    {
+      "address": "host.docker.internal:9500",
+      "advertise_addr": "http://host.docker.internal",
+      "path": "vault/",
+      "token": "VAULT_AGENT_TOKEN"
+    }
+  },
+  "listener":
+  {
+    "tcp":
+    {
+      "address": "0.0.0.0:8200",
+      "tls_disable": 1
+    }
+  },
+  "log_level": "DEBUG"
+}
