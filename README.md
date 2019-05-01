@@ -47,7 +47,7 @@ ED6F90AE-8254-4202-B157-E6B05339FD86
 
 Replace `CONSUL_MASTER_TOKEN` with the value you've generated in the [config/consul.json](config/consul.json) file
 
-```json
+```javascript
 {
   "datacenter": "dc-example",
   "data_dir": "/consul/data",
@@ -107,7 +107,7 @@ New Policy - copy/paste entries as presented below and save
 - **Name**: vault-agent
 - **Rules**:
 
-```json
+```javascript
 {
   "key_prefix": {
     "vault/": {
@@ -169,7 +169,7 @@ Replace the value of `VAULT_AGENT_TOKEN` in the [config/vault.json](config/vault
 
 From example, `VAULT_AGENT_TOKEN` = `d92ac4aa-836c-b887-6144-81dfaaa3366c`
 
-```json
+```javascript
 {
   "storage":
   {
@@ -315,20 +315,12 @@ You are now ready to start running vault commands
 
 Docker exec into the `client` container as described above, and set the value of `VAULT_TOKEN` as an environment variable (using the initial root token for demonstration purposes)
 
-```console
-docker exec -ti \
-  -e VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR \
-  client /bin/bash
-```
-
-```
+```bash
 export VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR
 export VAULT_ADDR=http://host.docker.internal:9200
-export CONSUL_HTTP_ADDR=host.docker.internal:9500
 docker run --rm -ti \
   -e VAULT_TOKEN=$VAULT_TOKEN \
   -e VAULT_ADDR=$VAULT_ADDR \
-  -e CONSUL_HTTP_ADDR=$CONSUL_HTTP_ADDR \
   -v $(pwd):/mnt/data \
   mjstealey/vault-client:latest \
   /bin/bash
@@ -390,7 +382,7 @@ HA Mode         active
 
 To enable a version 1 kv store
 
-```
+```bash
 vault secrets enable -version=1 kv
 ```
 
@@ -428,11 +420,11 @@ This is also visible from the consul UI under the Key/Value tab
 
 ### using curl
 
-Example cURL calls to a vault instance running on the localhost
+Example cURL calls to a vault instance running on the localhost (127.0.0.1)
 
 **Get list of keys**
 
-```
+```bash
 export VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR
 export VAULT_ADDR=http://127.0.0.1:9200
 curl \
@@ -466,7 +458,7 @@ $ curl -s \
 
 **Get data from key**
 
-```
+```bash
 export VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR
 export VAULT_ADDR=http://127.0.0.1:9200
 curl \
