@@ -1,12 +1,12 @@
 version: '3.6'
 services:
   consul:
+    image: consul:${CONSUL_VERSION}
     container_name: consul
     command: >-
       agent
       -bind=0.0.0.0
       -config-file=/config.json
-    image: consul:${CONSUL_VERSION}
     volumes:
       - ./config/consul.json:/config.json
     networks:
@@ -17,8 +17,8 @@ services:
       - "9600:9600/udp"
 
   vault:
-    container_name: vault
     image: vault:${VAULT_VERSION}
+    container_name: vault
     ports:
       - "9200:8200"
     volumes:

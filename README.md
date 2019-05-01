@@ -1,6 +1,5 @@
 # Vault with Consul backend in Docker
 
-
 The code herein should not be considered production level by any means, but rather serve as a development or learning environment for using HashiCorp Vault.
 
 **What is Vault?**
@@ -11,15 +10,33 @@ The code herein should not be considered production level by any means, but rath
 
 - Consul is a distributed service mesh to connect, secure, and configure services across any runtime platform and public or private cloud. [Read more](https://www.consul.io).
 
-This work is based on content from [http://pcarion.com/2017/04/30/A-consul-a-vault-and-a-docker-walk-into-a-bar..html](http://pcarion.com/2017/04/30/A-consul-a-vault-and-a-docker-walk-into-a-bar..html)
+This work was inspired by: [http://pcarion.com/2017/04/30/A-consul-a-vault-and-a-docker-walk-into-a-bar..html](http://pcarion.com/2017/04/30/A-consul-a-vault-and-a-docker-walk-into-a-bar..html)
 
-## Configure and run
+**Last updated**: 2019-04-29
+
+- [Consul](https://hub.docker.com/_/consul) version: **1.4.4**
+- [Vault](https://hub.docker.com/_/vault) version: **1.1.2**
 
 **NOTE**: The example provided is using [macOS specific Docker networking](https://docs.docker.com/docker-for-mac/networking/) values which would need to be modified to fit your environment.
 
-### ACL tokens
+## How to use
 
-Using `uuidgen`, generate two tokens, one for the consul master, and one for the vault agent
+### Configuration files
+
+Outside of development mode, Vault and Consul are configured using a file. The format of this file is [HCL](https://github.com/hashicorp/hcl) or JSON. The examples herein will use the JSON format.
+
+Copy the template files for both Vault and Consul.
+
+```
+cp config/vault.json.template config/vault.json
+cp config/consul.json.template config/consul.json
+```
+
+### Consul
+
+**Configure**
+
+Using `uuidgen`, generate a consul master token.
 
 Consul master token:
 
@@ -28,14 +45,7 @@ $ uuidgen
 ED6F90AE-8254-4202-B157-E6B05339FD86
 ```
 
-Vault agent token:
-
-```console
-$ uuidgen
-98402653-FF9A-4B7F-B564-2F4744E67B0B
-```
-
-Update the `acl_master_token` and `acl_agent_token` lines in [config/consul.config](config/consul.config)
+Replace `CONSUL_MASTER_TOKEN` with the value you've generated in the [config/consul.json](config/consul.json) file
 
 ```json
 {
@@ -48,10 +58,9 @@ Update the `acl_master_token` and `acl_agent_token` lines in [config/consul.conf
   "client_addr": "0.0.0.0",
   "ui" : true,
   "acl_datacenter": "dc-example",
-  "acl_master_token": "CONSUL_MASTER_TOKEN", ### <-- This
+  "acl_master_token": "CONSUL_MASTER_TOKEN", // <-- Replace with: ED6F90AE-8254-4202-B157-E6B05339FD86
   "acl_default_policy": "deny",
   "acl_down_policy": "extend-cache",
-  "acl_agent_token": "VAULT_AGENT_TOKEN", ### <-- This
   "ports": {
     "dns": 9600,
     "http": 9500,
@@ -63,18 +72,113 @@ Update the `acl_master_token` and `acl_agent_token` lines in [config/consul.conf
 }
 ```
 
-Update the `token` line in [config/vault.config](config/vault.config)
+
+**Start Consul**
+
+With the configuration file in place and updated with the master token, you can start the consul container with docker compose.
+
+```
+docker-compose up -d consul
+```
+
+Navigate to [http://127.0.0.1:9500]() and ensure the Consul UI is running
+
+<img width="80%" alt="Consul on startup" src="https://user-images.githubusercontent.com/5332509/56913034-a3eaac00-6a7e-11e9-98ca-3210a44ff7c8.png">
+
+From the ACL tab, enter the value generated for `CONSUL_MASTER_TOKEN` and press save
+
+<img width="80%" alt="Enter master token" src="https://user-images.githubusercontent.com/5332509/56913328-57ec3700-6a7f-11e9-9f13-e922ff1687a5.png">
+
+You should observe a success message and be operating as the root level administrator of Consul
+
+<img width="80%" alt="root level administrator" src="https://user-images.githubusercontent.com/5332509/56913341-5f134500-6a7f-11e9-99c2-67fa6c922efd.png">
+
+
+**Create a policy for Vault**
+
+From the ACL tab, select Policies and create a new policy
+
+<img width="80%" alt="Policies" src="https://user-images.githubusercontent.com/5332509/56913439-ad284880-6a7f-11e9-8cd1-e3a17691306d.png">
+
+New Policy - copy/paste entries as presented below and save
+
+<img width="80%" alt="New Policy" src="https://user-images.githubusercontent.com/5332509/56913598-10b27600-6a80-11e9-92f2-0e3418d0e172.png">
+
+- **Name**: vault-agent
+- **Rules**:
 
 ```json
 {
-  "backend":
+  "key_prefix": {
+    "vault/": {
+      "policy": "write"
+    }
+  },
+  "node_prefix": {
+    "": {
+      "policy": "write"
+    }
+  },
+  "service": {
+    "vault": {
+      "policy": "write"
+    }
+  },
+  "agent_prefix": {
+    "": {
+      "policy": "write"
+    }
+    
+  },
+  "session_prefix": {
+    "": {
+      "policy": "write"
+    }
+  }
+}
+```
+- **Description**: None
+
+You should observe a success message and see a new policy named **vault-agent** listed
+
+<img width="80%" alt="vault-agent policy" src="https://user-images.githubusercontent.com/5332509/56913735-6d159580-6a80-11e9-8aca-6ae8a7d1aa66.png">
+
+**Generate token for Vault**
+
+From the ACL tab, select Tokens and create a new token
+
+<img width="80%" alt="Tokens" src="https://user-images.githubusercontent.com/5332509/56913862-b1a13100-6a80-11e9-98fe-975e5ff440bf.png">
+
+New Token - apply existing **vault-agent** policy to new token named Vault Agent and save
+
+<img width="80%" alt="Create new token" src="https://user-images.githubusercontent.com/5332509/56914094-3429f080-6a81-11e9-8ff6-539f012eda14.png">
+
+You should observe a success message and see a new token named **Vault Agent** listed
+
+<img width="80%" alt="Vault Agent Token" src="https://user-images.githubusercontent.com/5332509/56914127-4f94fb80-6a81-11e9-9278-a5b0055e2234.png">
+
+### Vault
+
+**Configure**
+
+Click the Vault Agent token (puts it into edit mode) so that the details can be observed.
+
+<img width="80%" alt="token details" src="https://user-images.githubusercontent.com/5332509/56914248-9f73c280-6a81-11e9-95cc-0348dcee2482.png">
+
+Replace the value of `VAULT_AGENT_TOKEN` in the [config/vault.json](config/vault.json) file with newly generated Vault Agent Token 
+
+From example, `VAULT_AGENT_TOKEN` = `d92ac4aa-836c-b887-6144-81dfaaa3366c`
+
+```json
+{
+  "storage":
   {
     "consul":
     {
       "address": "host.docker.internal:9500",
       "advertise_addr": "http://host.docker.internal",
       "path": "vault/",
-      "token": "VAULT_AGENT_TOKEN" ### <-- This
+      "token": "VAULT_AGENT_TOKEN" // <-- Replace with: d92ac4aa-836c-b887-6144-81dfaaa3366c
     }
   },
   "listener":
@@ -87,155 +191,48 @@ Update the `token` line in [config/vault.config](config/vault.config)
   },
   "log_level": "DEBUG"
 }
+
 ```
 
-### Server settings
+**Start Vault**
 
-Update the settings in [config/vault.json](config/vault.json) and [docker-compose.yml](docker-compose.yml) to match the system you'll be deploying on.
+With the configuration file in place and updated with the vault token, you can start the vault container with docker compose.
 
-- From `config/vault.json`:
-    
-    ```json
-          "address":"host.docker.internal:9500",
-          "advertise_addr":"http://host.docker.internal",
-    ```
-
-- From `docker-compose.yml`:
-    
-    ```yaml
-        environment:
-          - CONSUL_HTTP_ADDR=host.docker.internal:9500
-          - VAULT_ADDR=http://host.docker.internal:9200
-    ```
-
-Ensure the Vault and Consul versions in the `.env` file are the same as defined in the client's `Dockerfile`
-
-- From `.env`:
-
-    ```bash
-    # Versions
-    VAULT_VERSION=0.11.1
-    CONSUL_VERSION=1.2.3
-    ```
-
-### Consul
-
-Start the consul container first
-
-```console
-$ docker-compose up -d consul
-Creating consul ... done
+```
+docker-compose up -d vault
 ```
 
-Check the Consul UI at [http://127.0.0.1:9500](http://127.0.0.1:9500)
+Navigate to [http://127.0.0.1:9500]() and verify that a new service named vault is running in standby mode.
 
-<img width="80%" alt="consul UI on start" src="https://user-images.githubusercontent.com/5332509/46502862-2bc54c00-c7f7-11e8-8368-1b1e3f21a055.png">
-
-Notice that you will not be able to interact with any of the settings until you've provided the proper ACL token
-
-From the **Settings** tab, paste your `CONSUL_MASTER_TOKEN` into the **ACL TOKEN** box and Save.
-
-<img width="80%" alt="consul master token" src="https://user-images.githubusercontent.com/5332509/46502990-8bbbf280-c7f7-11e8-89bd-a3d7f3c52bc6.png">
-
-Now return to the services tab and you should see the **consul** service running
-
-<img width="80%" alt="consul service" src="https://user-images.githubusercontent.com/5332509/46503055-bc9c2780-c7f7-11e8-983b-ef2befda115d.png">
-
-### Register Vault agent ACL
-
-We previously generated a token for our Vault agent, but have not registered it into Consul as of yet.
-
-Go to the ACL tab and choose to create a new ACL token
-
-<img width="80%" alt="acl create" src="https://user-images.githubusercontent.com/5332509/46503162-100e7580-c7f8-11e8-9e30-0823414285ef.png">
-
-Populate the fields with the following information and save:
-
-- NAME: **vault-agent**
-- Choose **CLIENT** radio button
-- POLICY: 
-
-    ```json
-    {
-      "key": {
-        "vault/": {
-          "policy": "write"
-        }
-      },
-      "node": {
-        "": {
-          "policy": "write"
-        }
-      },
-      "service": {
-        "vault": {
-          "policy": "write"
-        }
-      },
-      "agent": {
-        "": {
-          "policy": "write"
-        }
-    
-      },
-      "session": {
-        "": {
-          "policy": "write"
-        }
-      }
-    }
-    ```
-- ID: generated **VAULT_AGENT_TOKEN**
-
-<img width="80%" alt="vault agent token" src="https://user-images.githubusercontent.com/5332509/46503469-e6098300-c7f8-11e8-9ab7-c57890862779.png">
-
-You'll now see a new ACL registered in Consul
-
-<img width="80%" alt="acl registered" src="https://user-images.githubusercontent.com/5332509/46503557-29fc8800-c7f9-11e8-9f71-74ce0ea2d8b4.png">
-
-We are now ready to start the vault container
-
-### Vault
-
-Start the vault container
-
-```console
-$ docker-compose up -d vault
-Creating vault ... done
-```
-
-Check the Consul UI for the new vault service [http://127.0.0.1:9500](http://127.0.0.1:9500)
-
-<img width="80%" alt="start vault" src="https://user-images.githubusercontent.com/5332509/46503691-8e1f4c00-c7f9-11e8-8446-ca51c41e9d01.png">
+<img width="80%" alt="Services" src="https://user-images.githubusercontent.com/5332509/56924171-4d8b6680-6a9a-11e9-9690-d9685de8d6ec.png">
 
 Vault has been started, but not yet initialized. For this we'll use the vault client to interact with the RESTful API of the vault container.
 
-### Vault Client
+## Vault Client
 
 Build and run the vault client in docker-compose
 
-```console
-$ docker-compose build
-$ docker-compose up -d client
-Creating client ... done
+```
+docker-compose build
+docker-compose up -d client
 ```
 
-The vault client is set to volume mount the [client-scripts](client-scripts/) directory as `/mnt/data` of the running `client` container.
+The vault client defaults to volume mounting the [client-scripts](client-scripts) directory as `/mnt/data` of the running client container.
 
 Docker exec onto the client container, initialize and unseal the vault.
 
 ```console
 $ docker exec -ti client /bin/bash
-root@d5422a13cd59:/# cd /mnt/data/
-root@d5422a13cd59:/mnt/data# ./initialize-and-unseal.sh
+root@ac3e3a01a4a5:/# cd /mnt/data/
+root@ac3e3a01a4a5:/mnt/data# ./initialize-and-unseal.sh
 INFO: init Vault
-Unseal Key 1: kIxHHDH3S/xlKVgy+oEncP9U2mQDq4KCdzr08d4S837n
-Unseal Key 2: AGUiDKcWzLONaqLlCUxDjKT6ExhFsY+xYRFrpR9BoC9h
-Unseal Key 3: Wo2WjjKCdWXyupvtMrjyaB+WclSebVhjU9MAsCWgYmpB
-Unseal Key 4: h6HpWksKFsr6sTdC/rvH4jX0pwom+pisibNECFAjwdR4
-Unseal Key 5: 1wLVrhT7F0VPUkvIgurcvbqrUthh7b9Bk0eIqMDsrWmC
+Unseal Key 1: CkU4RFOn0jl3IoD3ZBMId3g9V4yPqaBPwLZtelBn4ZXB
+Unseal Key 2: 0mn/hNvkzY8FvBMpmqQfXTLa+9L0OaWKeFmIlINiwdmR
+Unseal Key 3: DAEJRhYvD+P2um40CfJ50okF23MQaBJpymmPWupWGhM3
+Unseal Key 4: +M8F0DfI7JqpWEFMKxVx4meUlQD/f8UigxbRohc01Qkc
+Unseal Key 5: 6douRfxKIlqfzEodMjPHSELT+WLm+PVw4d/37Ibf1WQQ
 
-Initial Root Token: d0d3e78f-8e5b-3cb3-bc05-d4c117a5645e
+Initial Root Token: s.ZQSMW5tJmSXNhGFZrr0oKuUR
 
 Vault initialized with 5 key shares and a key threshold of 3. Please securely
 distribute the key shares printed above. When the Vault is re-sealed,
@@ -251,32 +248,35 @@ INFO: unseal Vault
 Key                Value
 ---                -----
 Seal Type          shamir
+Initialized        true
 Sealed             true
 Total Shares       5
 Threshold          3
 Unseal Progress    1/3
-Unseal Nonce       7d82bc48-85eb-3fd5-4588-79edba4e425e
-Version            0.11.1
+Unseal Nonce       7389c6bd-768c-3bad-aea6-c1b923141019
+Version            1.1.2
 HA Enabled         true
 Key                Value
 ---                -----
 Seal Type          shamir
+Initialized        true
 Sealed             true
 Total Shares       5
 Threshold          3
 Unseal Progress    2/3
-Unseal Nonce       7d82bc48-85eb-3fd5-4588-79edba4e425e
-Version            0.11.1
+Unseal Nonce       7389c6bd-768c-3bad-aea6-c1b923141019
+Version            1.1.2
 HA Enabled         true
 Key                    Value
 ---                    -----
 Seal Type              shamir
+Initialized            true
 Sealed                 false
 Total Shares           5
 Threshold              3
-Version                0.11.1
-Cluster Name           vault-cluster-9bd61b1e
-Cluster ID             044d1768-4137-f735-c814-6da43e5ae58f
+Version                1.1.2
+Cluster Name           vault-cluster-a1069ec3
+Cluster ID             115e5944-aa2b-3cb6-2fc4-c1778c84b36a
 HA Enabled             true
 HA Cluster             n/a
 HA Mode                standby
@@ -284,120 +284,57 @@ Active Node Address    <none>
 Key             Value
 ---             -----
 Seal Type       shamir
+Initialized     true
 Sealed          false
 Total Shares    5
 Threshold       3
-Version         0.11.1
-Cluster Name    vault-cluster-9bd61b1e
-Cluster ID      044d1768-4137-f735-c814-6da43e5ae58f
+Version         1.1.2
+Cluster Name    vault-cluster-a1069ec3
+Cluster ID      115e5944-aa2b-3cb6-2fc4-c1778c84b36a
 HA Enabled      true
 HA Cluster      https://host.docker.internal:444
 HA Mode         active
 INFO: Vault has been unsealed
 VAULT_ADDR=http://host.docker.internal:9200
-VAULT_VERSION=0.11.1
-VAULT_TOKEN=d0d3e78f-8e5b-3cb3-bc05-d4c117a5645e
+VAULT_VERSION=1.1.2
+VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR
 ```
 
 At this stage the vault service should be unsealed and active
 
-<img width="80%" alt="unsealed vault" src="https://user-images.githubusercontent.com/5332509/46503975-801dfb00-c7fa-11e8-8250-3a0624f9fc7b.png">
+<img width="80%" alt="Services active" src="https://user-images.githubusercontent.com/5332509/56924549-297c5500-6a9b-11e9-9350-256aa0dfa8f5.png">
 
 **NOTE**: The vault can also be initialized and unsealed manually using the following commands
 
 - `$ vault operator init`: Initialize the vault
 - `$ vault operator unseal`: Unseal vault - follow the prompts
 
-You are now ready to start creating secrets
+You are now ready to start running vault commands
 
-## Creating secrets
+## Vault commands
 
-Docker exec into the `client` container as described above.
-
-Export token (using the initial root token for demonstration purposes)
+Docker exec into the `client` container as described above, and set the value of `VAULT_TOKEN` as an environment variable (using the initial root token for demonstration purposes)
 
 ```console
-# export VAULT_TOKEN=d0d3e78f-8e5b-3cb3-bc05-d4c117a5645e
+docker exec -ti \
+  -e VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR \
+  client /bin/bash
 ```
 
-Create kv pair
-
-```console
-# vault kv put secret/hello foo=world
-Success! Data written to: secret/hello
+```
+export VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR
+export VAULT_ADDR=http://host.docker.internal:9200
+export CONSUL_HTTP_ADDR=host.docker.internal:9500
+docker run --rm -ti \
+  -e VAULT_TOKEN=$VAULT_TOKEN \
+  -e VAULT_ADDR=$VAULT_ADDR \
+  -e CONSUL_HTTP_ADDR=$CONSUL_HTTP_ADDR \
+  -v $(pwd):/mnt/data \
+  mjstealey/vault-client:latest \
+  /bin/bash
 ```
 
-Get secret
-
-```console
-# vault kv get secret/hello
-=== Data ===
-Key    Value
----    -----
-foo    world
-```
-
-### using curl
-
-Get list of keys
-
-```console
-# curl \
->   --header "X-Vault-Token: $VAULT_TOKEN" \
->   --request LIST \
->   "http://host.docker.internal:9200/v1/secret"
-{
-  "request_id":"a64d2863-54d0-e3b7-a31b-8b07de648097",
-  "lease_id":"",
-  "renewable":false,
-  "lease_duration":0,
-  "data":
-  {
-    "keys":
-    [
-      "hello"
-    ]
-  },
-  "wrap_info":null,
-  "warnings":null,
-  "auth":null
-}
-```
-
-Get data from key
-
-```console
-# curl \
->   --header "X-Vault-Token: $VAULT_TOKEN" \
->   "http://docker.for.mac.localhost:9200/v1/secret/hello"
-{
-  "request_id":"e958a939-89c3-04e1-29d1-d191457f607a",
-  "lease_id":"",
-  "renewable":false,
-  "lease_duration":2764800,
-  "data":
-  {
-    "foo":"world"
-  },
-  "wrap_info":null,
-  "warnings":null,
-  "auth":null
-}
-```
-
-### From the Consul UI
-
-From the **Settings** tab, enter the `VAULT_AGENT_TOKEN` into the **ACL TOKEN** field and Save
-
-<img width="80%" alt="vault agent token" src="https://user-images.githubusercontent.com/5332509/46504473-0850d000-c7fc-11e8-8ea5-d92b7550a2f1.png">
-
-Navigate to the **Key/Value** tab and select `vault` > `logical` > `GUID` > `hello`
-
-<img width="80%" alt="key/value" src="https://user-images.githubusercontent.com/5332509/46504570-43eb9a00-c7fc-11e8-9137-423bd4fa343c.png">
-
-From the Consul UI, assuming a valid ACL token, you can update, create and delete key/value pairs 
-
-## help
+**help**
 
 ```console
 # vault --help
@@ -424,9 +361,137 @@ Other commands:
     path-help      Retrieve API help for paths
     plugin         Interact with Vault plugins and catalog
     policy         Interact with policies
+    print          Prints runtime configurations
     secrets        Interact with secrets engines
     ssh            Initiate an SSH session
     token          Interact with tokens
+```
+
+**status**
+
+```console
+# vault status
+Key             Value
+---             -----
+Seal Type       shamir
+Initialized     true
+Sealed          false
+Total Shares    5
+Threshold       3
+Version         1.1.2
+Cluster Name    vault-cluster-a1069ec3
+Cluster ID      115e5944-aa2b-3cb6-2fc4-c1778c84b36a
+HA Enabled      true
+HA Cluster      https://host.docker.internal:444
+HA Mode         active
+```
+
+**kv secrets**
+
+To enable a version 1 kv store
+
+```
+vault secrets enable -version=1 kv
+```
+
+After the secrets engine is configured and a user/machine has a Vault token with the proper permission, it can generate credentials. The kv secrets engine allows for writing keys with arbitrary values.
+
+Write arbitrary data:
+
+```console
+# vault kv put kv/my-secret my-value=s3cr3t
+Success! Data written to: kv/my-secret
+```
+
+Read arbitrary data:
+
+```console
+# vault kv get kv/my-secret
+====== Data ======
+Key         Value
+---         -----
+my-value    s3cr3t
+```
+
+List the keys:
+
+```console
+# vault kv list kv/
+Keys
+----
+my-secret
+```
+
+This is also visible from the consul UI under the Key/Value tab
+
+<img width="80%" alt="my-secret" src="https://user-images.githubusercontent.com/5332509/57043536-d4287b00-6c35-11e9-8718-de8f90e4af39.png">
+
+### using curl
+
+Example cURL calls to a vault instance running on the localhost
+
+**Get list of keys**
+
+```
+export VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR
+export VAULT_ADDR=http://127.0.0.1:9200
+curl \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  --request LIST \
+  "$VAULT_ADDR/v1/kv"
+```
+
+Example: 
+
+```console
+$ curl -s \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  --request LIST \
+  "$VAULT_ADDR/v1/kv" | jq .
+{
+  "request_id": "400a6e82-212f-3276-cda9-f0b1622c95b0",
+  "lease_id": "",
+  "renewable": false,
+  "lease_duration": 0,
+  "data": {
+    "keys": [
+      "my-secret"
+    ]
+  },
+  "wrap_info": null,
+  "warnings": null,
+  "auth": null
+}
+```
+
+**Get data from key**
+
+```
+export VAULT_TOKEN=s.ZQSMW5tJmSXNhGFZrr0oKuUR
+export VAULT_ADDR=http://127.0.0.1:9200
+curl \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  "$VAULT_ADDR/v1/kv/my-secret"
+```
+
+Example:
+
+```console
+$ curl -s \
+  --header "X-Vault-Token: $VAULT_TOKEN" \
+  "$VAULT_ADDR/v1/kv/my-secret" | jq .
+{
+  "request_id": "2e2480c6-9a8f-8b65-2914-2b9813c0a1e7",
+  "lease_id": "",
+  "renewable": false,
+  "lease_duration": 2764800,
+  "data": {
+    "my-value": "s3cr3t"
+  },
+  "wrap_info": null,
+  "warnings": null,
+  "auth": null
+}
 ```
 
 ## References
