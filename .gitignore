@@ -1,2 +1,5 @@
 .idea
 .DS_Store
+config/consul.json
+config/vault.json
+client-scripts/init.output

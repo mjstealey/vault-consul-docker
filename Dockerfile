@@ -1,8 +1,8 @@
 FROM ubuntu:16.04
 MAINTAINER Michael J. Stealey <michael.j.stealey@gmail.com>
 
-ENV VAULT_VERSION=0.11.1 \
-  CONSUL_VERSION=1.2.3
+ENV VAULT_VERSION=1.1.2 \
+  CONSUL_VERSION=1.4.4
 
 RUN apt-get update \
   && apt-get install -y \
